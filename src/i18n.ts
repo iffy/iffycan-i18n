@@ -1,0 +1,208 @@
+import * as moment from 'moment-timezone'
+import { EventSource } from '@iffycan/events'
+
+
+//-----------------------------------------------------------------
+// Message structure
+//-----------------------------------------------------------------
+/**
+ *  An individual message in a IMessageSet
+ */
+export interface IMsg<T> {
+  val: T;
+  translated: boolean;
+  h: string;
+  newval?: T;
+}
+/**
+ *  An applications set of messages
+ */
+export interface IMessageSet {
+  [k:string]: IMsg<any>;
+}
+/**
+ *  A locale for the application
+ */
+export interface ILangPack<T extends IMessageSet> {
+  name: string;
+  dir: 'ltr'|'rtl';
+  numbers: NumberFormat;
+  messages: T;
+  contributors: Array<{
+    name: string;
+    href?: string;
+  }>;
+}
+
+//-----------------------------------------------------------------
+// Numbers
+//-----------------------------------------------------------------
+export interface ISeps {
+  group: string;
+  group_regex: RegExp;
+  decimal: string;
+  decimal_regex: RegExp;
+}
+export type NumberFormat =
+  | ''
+  | 'comma-period'
+  | 'period-comma'
+  | 'space-comma'
+
+export type NumberFormatDef = {
+  [K in NumberFormat]: INumberFormat
+}
+export type NumberFormatExample = {
+  [K in NumberFormat]: string;
+}
+export interface INumberFormat {
+  group: string;
+  group_regex: RegExp;
+  decimal: string;
+  decimal_regex: RegExp;
+}
+export const NUMBER_FORMAT_EXAMPLES:NumberFormatExample = {
+  '': '',
+  'comma-period': '1,400.82',
+  'period-comma': '1.400,82',
+  'space-comma': '1 400,82',
+}
+export const NUMBER_FORMATS:NumberFormatDef = {
+  '': {
+    group: ',',
+    group_regex: /,/g,
+    decimal: '.',
+    decimal_regex: /\./g,
+  },
+  'comma-period': {
+    group: ',',
+    group_regex: /,/g,
+    decimal: '.',
+    decimal_regex: /\./g,
+  },
+  'period-comma': {
+    group: '.',
+    group_regex: /\./g,
+    decimal: ',',
+    decimal_regex: /,/g,
+  },
+  'space-comma': {
+    group: ' ',
+    group_regex: /[ ]/g,
+    decimal: ',',
+    decimal_regex: /,/g,
+  }
+}
+export let SEPS:ISeps = NUMBER_FORMATS[''];
+
+
+export class TranslationContext<M extends IMessageSet> {
+  private _langpack!:ILangPack<M>;
+  private _locale!:string;
+
+  readonly localechanged = new EventSource<{locale:string}>();
+
+  constructor(private langpackbase:string) {
+
+  }
+
+  get locale() {
+    return this._locale
+  }
+  get langpack() {
+    return this._langpack;
+  }
+  private async loadLangPack(locale:string) {
+    const mod = await import(`${this.langpackbase}/${locale}`);
+    return mod.pack as ILangPack<M>;
+  }
+  async setLocale(x:string) {
+    
+    // only 2-letter shortcodes are supported right now
+    let totry:string[] = [
+      x.substr(0, 2),
+    ]
+    for (const locale of totry) {
+      try {
+        // language
+        this._langpack = await this.loadLangPack(locale);
+        this._locale = locale;
+        console.info(`locale set to: ${locale}`);
+
+        // date
+        try {
+          await import(`moment/locale/${locale}`);
+          moment.locale(this._locale)
+          console.info('date format set');
+        } catch(err) {
+          if (locale !== 'en') {
+            console.error('Error setting date locale', err.stack);  
+          }
+        }
+
+        // numbers
+        try {
+          Object.assign(SEPS, this.getNumberFormat());
+          console.info('number format set:', JSON.stringify(SEPS));
+        } catch(err) {
+          console.error('Error setting number format', err.stack);
+        }
+
+        this.localechanged.emit({locale: this._locale});
+        break;
+      } catch(err) {
+        console.error(`Error setting locale to ${locale}`)
+        console.error(err.stack);
+      }  
+    }
+  }
+  getNumberFormat():INumberFormat {
+    return NUMBER_FORMATS[this.langpack.numbers]
+  }
+  sss<T>(key:keyof M, dft?:T):T {
+    let entry = this._langpack.messages[key];
+    if (dft === undefined && typeof key === 'string') {
+      // The key is the string to translate.
+      return (entry ? entry.val : key) as any;
+    } else {
+      return (entry ? entry.val : dft) as any;
+    }
+  }
+  toString() {
+    return `TranslationContext locale=${this._locale}`;
+  }
+  /**
+   *  Call this to start localization for renderer HTML/JS pages
+   */
+  async localizeThisHTMLPage(locale:string, args?:{
+      skipwatch?:boolean,
+    }) {
+    args = args || {};
+    if (!this._locale) {
+      await this.setLocale(locale);
+    }
+    document.documentElement.setAttribute('dir', this.langpack.dir);
+    Array.from(document.querySelectorAll<HTMLElement>('[data-translate]'))
+    .forEach((elem:HTMLElement) => {
+      try {
+        let trans_id = elem.getAttribute('data-translate');
+        let dft = elem.innerText;
+        if (!trans_id) {
+          trans_id = dft;
+        }
+        elem.innerHTML = this.sss(trans_id as any, dft);
+      } catch(err) {
+        console.warn('Localization error:', err, elem);
+      }
+    })
+    if (!args.skipwatch) {
+      this.localechanged.on(() => {
+        console.info('Re-localizing page', this.locale);
+        this.localizeThisHTMLPage(this.locale, {skipwatch:true});
+      })
+    }
+  }
+}
+
+
+
