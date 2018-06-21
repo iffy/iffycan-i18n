@@ -1,7 +1,7 @@
 {
   "name": "@iffycan/i18n",
   "url": "https://github.com/iffy/i18n-typescript",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "Typed i18n and l10n",
   "main": "./dist/i18n.js",
   "types": "./dist/i18n.d.ts",
@@ -9,7 +9,7 @@
   "license": "MIT",
   "private": false,
   "scripts": {
-    "sprepare": "tsc"
+    "prepare": "tsc"
   },
   "devDependencies": {
     "@types/moment-timezone": "^0.5.6",

@@ -1,6 +1,9 @@
 import * as moment from 'moment-timezone'
 import { EventSource } from '@iffycan/events'
 
+export let config = {
+  logger: console,
+}
 
 //-----------------------------------------------------------------
 // Message structure
@@ -23,11 +26,11 @@ export interface IMessageSet {
 /**
  *  A locale for the application
  */
-export interface ILangPack<T extends IMessageSet> {
+export interface ILangPack {
   name: string;
   dir: 'ltr'|'rtl';
   numbers: NumberFormat;
-  messages: T;
+  messages: IMessageSet;
   contributors: Array<{
     name: string;
     href?: string;
@@ -96,14 +99,17 @@ export const NUMBER_FORMATS:NumberFormatDef = {
 export let SEPS:ISeps = NUMBER_FORMATS[''];
 
 
-export class TranslationContext<M extends IMessageSet> {
-  private _langpack!:ILangPack<M>;
+export class TranslationContext {
+  private _langpack!:ILangPack;
   private _locale!:string;
+  private langpack_basepath!:string;
 
   readonly localechanged = new EventSource<{locale:string}>();
 
-  constructor(private langpackbase:string) {
-
+  configure(args:{
+    langpack_basepath: string,
+  }) {
+    this.langpack_basepath = args.langpack_basepath;
   }
 
   get locale() {
@@ -113,8 +119,8 @@ export class TranslationContext<M extends IMessageSet> {
     return this._langpack;
   }
   private async loadLangPack(locale:string) {
-    const mod = await import(`${this.langpackbase}/${locale}`);
-    return mod.pack as ILangPack<M>;
+    const mod = await import(`${this.langpack_basepath}/${locale}`);
+    return mod.pack as ILangPack;
   }
   async setLocale(x:string) {
     
@@ -127,39 +133,42 @@ export class TranslationContext<M extends IMessageSet> {
         // language
         this._langpack = await this.loadLangPack(locale);
         this._locale = locale;
-        console.info(`locale set to: ${locale}`);
+        config.logger.info(`locale set to: ${locale}`);
 
         // date
         try {
           await import(`moment/locale/${locale}`);
           moment.locale(this._locale)
-          console.info('date format set');
+          config.logger.info('date format set');
         } catch(err) {
           if (locale !== 'en') {
-            console.error('Error setting date locale', err.stack);  
+            config.logger.error('Error setting date locale', err.stack);  
           }
         }
 
         // numbers
         try {
           Object.assign(SEPS, this.getNumberFormat());
-          console.info('number format set:', JSON.stringify(SEPS));
+          config.logger.info('number format set:', JSON.stringify(SEPS));
         } catch(err) {
-          console.error('Error setting number format', err.stack);
+          config.logger.error('Error setting number format', err.stack);
         }
 
         this.localechanged.emit({locale: this._locale});
         break;
       } catch(err) {
-        console.error(`Error setting locale to ${locale}`)
-        console.error(err.stack);
+        config.logger.error(`Error setting locale to ${locale}`)
+        config.logger.error(err.stack);
       }  
     }
   }
   getNumberFormat():INumberFormat {
     return NUMBER_FORMATS[this.langpack.numbers]
   }
-  sss<T>(key:keyof M, dft?:T):T {
+  sss<T>(key:keyof IMessageSet, dft?:T):T {
+    if (!this._langpack) {
+      throw new Error(`Attmpting to use sss() before setting the locale: ${key}`)
+    }
     let entry = this._langpack.messages[key];
     if (dft === undefined && typeof key === 'string') {
       // The key is the string to translate.
@@ -192,12 +201,12 @@ export class TranslationContext<M extends IMessageSet> {
         }
         elem.innerHTML = this.sss(trans_id as any, dft);
       } catch(err) {
-        console.warn('Localization error:', err, elem);
+        config.logger.warn('Localization error:', err, elem);
       }
     })
     if (!args.skipwatch) {
       this.localechanged.on(() => {
-        console.info('Re-localizing page', this.locale);
+        config.logger.info('Re-localizing page', this.locale);
         this.localizeThisHTMLPage(this.locale, {skipwatch:true});
       })
     }
@@ -205,4 +214,23 @@ export class TranslationContext<M extends IMessageSet> {
 }
 
 
+//---------------------------------------------------------
+// Singleton Context
+//
+// From https://derickbailey.com/2016/03/09/creating-a-true-singleton-in-node-js-with-es6-symbols/
+//---------------------------------------------------------
+const I18N_SINGLETON_KEY = Symbol.for("@iffycan.i18n");
+let singleton:TranslationContext;
+
+if ((global as any)[I18N_SINGLETON_KEY] === undefined) {
+  // First time
+  singleton = (global as any)[I18N_SINGLETON_KEY] = new TranslationContext();
+} else {
+  // Subsequent times
+  singleton = (global as any)[I18N_SINGLETON_KEY]
+}
+
+export const CONTEXT = singleton;
+export const sss = singleton.sss.bind(singleton);
+export const configure = singleton.configure.bind(singleton);
 
