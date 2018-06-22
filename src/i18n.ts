@@ -96,13 +96,13 @@ export const NUMBER_FORMATS:NumberFormatDef = {
     decimal_regex: /,/g,
   }
 }
-export let SEPS:ISeps = NUMBER_FORMATS[''];
-
 
 export class TranslationContext {
   private _langpack!:ILangPack;
   private _locale!:string;
   private langpack_basepath!:string;
+
+  public number_seps:ISeps = NUMBER_FORMATS[''];
 
   readonly localechanged = new EventSource<{locale:string}>();
 
@@ -148,8 +148,8 @@ export class TranslationContext {
 
         // numbers
         try {
-          Object.assign(SEPS, this.getNumberFormat());
-          config.logger.info('number format set:', JSON.stringify(SEPS));
+          Object.assign(this.number_seps, this.getNumberFormat());
+          config.logger.info('number format set:', JSON.stringify(this.number_seps));
         } catch(err) {
           config.logger.error('Error setting number format', err.stack);
         }
