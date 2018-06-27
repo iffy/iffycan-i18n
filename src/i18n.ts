@@ -101,15 +101,18 @@ export class TranslationContext {
   private _langpack!:ILangPack;
   private _locale!:string;
   private langpack_basepath!:string;
+  private default_locale!:string;
 
   public number_seps:ISeps = NUMBER_FORMATS[''];
 
   readonly localechanged = new EventSource<{locale:string}>();
 
   configure(args:{
+    default_locale: string,
     langpack_basepath: string,
   }) {
     this.langpack_basepath = args.langpack_basepath;
+    this.default_locale = args.default_locale.substr(0, 2);
   }
 
   get locale() {
@@ -127,6 +130,7 @@ export class TranslationContext {
     // only 2-letter shortcodes are supported right now
     let totry:string[] = [
       x.substr(0, 2),
+      this.default_locale,
     ]
     for (const locale of totry) {
       try {
@@ -141,7 +145,7 @@ export class TranslationContext {
           moment.locale(this._locale)
           config.logger.info('date format set');
         } catch(err) {
-          if (locale !== 'en') {
+          if (locale !== this.default_locale) {
             config.logger.error('Error setting date locale', err.stack);  
           }
         }
