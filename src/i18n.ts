@@ -97,10 +97,14 @@ export const NUMBER_FORMATS:NumberFormatDef = {
   }
 }
 
+export interface LangPackFetcher {
+  (locale:string):Promise<ILangPack>
+}
+
 export class TranslationContext {
   private _langpack!:ILangPack;
   private _locale!:string;
-  private langpack_basepath!:string;
+  private fetcher!:LangPackFetcher;
   private default_locale!:string;
 
   public number_seps:ISeps = NUMBER_FORMATS[''];
@@ -108,11 +112,11 @@ export class TranslationContext {
   readonly localechanged = new EventSource<{locale:string}>();
 
   configure(args:{
-    default_locale: string,
-    langpack_basepath: string,
+    default_locale: string;
+    fetcher: LangPackFetcher;
   }) {
-    this.langpack_basepath = args.langpack_basepath;
     this.default_locale = args.default_locale.substr(0, 2);
+    this.fetcher = args.fetcher;
   }
 
   get locale() {
@@ -122,8 +126,7 @@ export class TranslationContext {
     return this._langpack;
   }
   private async loadLangPack(locale:string) {
-    const mod = await import(`${this.langpack_basepath}/${locale}`);
-    return mod.pack as ILangPack;
+    return this.fetcher(locale);
   }
   async setLocale(x:string) {
     
@@ -141,7 +144,6 @@ export class TranslationContext {
 
         // date
         try {
-          await import(`moment/locale/${locale}`);
           moment.locale(this._locale)
           config.logger.info('date format set');
         } catch(err) {
