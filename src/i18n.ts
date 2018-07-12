@@ -223,9 +223,9 @@ export class TranslationContext {
 //---------------------------------------------------------
 // Singleton Context
 //
-// From https://derickbailey.com/2016/03/09/creating-a-true-singleton-in-node-js-with-es6-symbols/
+// Used to be from https://derickbailey.com/2016/03/09/creating-a-true-singleton-in-node-js-with-es6-symbols/
 //---------------------------------------------------------
-const I18N_SINGLETON_KEY = Symbol.for("@iffycan.i18n");
+const I18N_SINGLETON_KEY = "@iffycan.i18n.tx.singleton";
 let singleton:TranslationContext;
 
 if ((global as any)[I18N_SINGLETON_KEY] === undefined) {
