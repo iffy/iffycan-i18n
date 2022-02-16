@@ -1,4 +1,3 @@
-import * as moment from 'moment-timezone'
 import { EventSource } from '@iffycan/events'
 
 export let config = {
@@ -40,61 +39,10 @@ export interface ILangPack {
 //-----------------------------------------------------------------
 // Numbers
 //-----------------------------------------------------------------
-export interface ISeps {
-  group: string;
-  group_regex: RegExp;
+export interface NumberFormat {
+  thousands: string;
   decimal: string;
-  decimal_regex: RegExp;
-}
-export type NumberFormat =
-  | ''
-  | 'comma-period'
-  | 'period-comma'
-  | 'space-comma'
-
-export type NumberFormatDef = {
-  [K in NumberFormat]: INumberFormat
-}
-export type NumberFormatExample = {
-  [K in NumberFormat]: string;
-}
-export interface INumberFormat {
-  group: string;
-  group_regex: RegExp;
-  decimal: string;
-  decimal_regex: RegExp;
-}
-export const NUMBER_FORMAT_EXAMPLES:NumberFormatExample = {
-  '': '',
-  'comma-period': '1,400.82',
-  'period-comma': '1.400,82',
-  'space-comma': '1 400,82',
-}
-export const NUMBER_FORMATS:NumberFormatDef = {
-  '': {
-    group: ',',
-    group_regex: /,/g,
-    decimal: '.',
-    decimal_regex: /\./g,
-  },
-  'comma-period': {
-    group: ',',
-    group_regex: /,/g,
-    decimal: '.',
-    decimal_regex: /\./g,
-  },
-  'period-comma': {
-    group: '.',
-    group_regex: /\./g,
-    decimal: ',',
-    decimal_regex: /,/g,
-  },
-  'space-comma': {
-    group: ' ',
-    group_regex: /[ ]/g,
-    decimal: ',',
-    decimal_regex: /,/g,
-  }
+  decimal_places: number;
 }
 
 export interface LangPackFetcher {
@@ -107,7 +55,11 @@ export class TranslationContext {
   private fetcher!:LangPackFetcher;
   private default_locale!:string;
 
-  public number_seps:ISeps = NUMBER_FORMATS[''];
+  public number_format:NumberFormat = {
+    thousands: ',',
+    decimal: '.',
+    decimal_places: 2,
+  };
 
   readonly localechanged = new EventSource<{locale:string}>();
 
@@ -142,20 +94,20 @@ export class TranslationContext {
         this._locale = locale;
         config.logger.info(`locale set to: ${locale}`);
 
-        // date
-        try {
-          moment.locale(this._locale)
-          config.logger.info('date format set');
-        } catch(err) {
-          if (locale !== this.default_locale) {
-            config.logger.error('Error setting date locale', err.stack);  
-          }
-        }
+        // // date
+        // try {
+        //   moment.locale(this._locale)
+        //   config.logger.info('date format set');
+        // } catch(err) {
+        //   if (locale !== this.default_locale) {
+        //     config.logger.error('Error setting date locale', err.stack);  
+        //   }
+        // }
 
         // numbers
         try {
-          Object.assign(this.number_seps, this.getNumberFormat());
-          config.logger.info('number format set:', JSON.stringify(this.number_seps));
+          Object.assign(this.number_format, this.getNumberFormat());
+          config.logger.info('number format set:', JSON.stringify(this.number_format));
         } catch(err) {
           config.logger.error('Error setting number format', err.stack);
         }
@@ -163,13 +115,12 @@ export class TranslationContext {
         this.localechanged.emit({locale: this._locale});
         break;
       } catch(err) {
-        config.logger.error(`Error setting locale to ${locale}`)
-        config.logger.error(err.stack);
+        config.logger.error(`Error setting locale to ${locale}: ${err}`)
       }  
     }
   }
-  getNumberFormat():INumberFormat {
-    return NUMBER_FORMATS[this.langpack.numbers]
+  getNumberFormat():NumberFormat {
+    return this.langpack.numbers;
   }
   sss<T>(key:keyof IMessageSet, dft?:T):T {
     if (!this._langpack) {
