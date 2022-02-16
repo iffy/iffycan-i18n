@@ -1,7 +1,7 @@
 {
   "name": "@iffycan/i18n",
   "url": "https://github.com/iffy/i18n-typescript",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "Typed i18n and l10n",
   "main": "./dist/i18n.js",
   "types": "./dist/i18n.d.ts",
@@ -11,8 +11,8 @@
   "scripts": {
     "prepare": "tsc"
   },
-  "files": [ 
-    "dist/*" 
+  "files": [
+    "dist/*"
   ],
   "devDependencies": {
     "@types/node": "^10.3.1",
