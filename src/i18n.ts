@@ -12,7 +12,7 @@ export let config = {
  */
 export interface IMsg<T> {
   val: T;
-  translated: boolean;
+  translated: boolean|'ai';
   h: string;
   newval?: T;
 }
